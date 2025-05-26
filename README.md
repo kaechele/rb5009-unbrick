@@ -5,10 +5,14 @@ Firmware) and/or Backup Bootloader.
 
 ## Why
 
-MikroTik distributed a backup bootloader upgrade on their support Wiki which
-supposedly was "universal" and for all platforms. Unfortunately, when applied on
-the RB5009 it erases the ATF and Backup Bootloader and renders the device
-unbootable and unrecoverable via Netinstall.
+Around the first week of May 2025, MikroTik distributed a backup bootloader
+upgrade on their support Wiki which supposedly was "universal" and for all
+platforms. Unfortunately, when applied on the RB5009 it erases the ATF and
+Backup Bootloader and renders the device unbootable and unrecoverable via
+Netinstall.
+
+See
+[the MikroTik Forum discussion topic](https://forum.mikrotik.com/viewtopic.php?t=216738).
 
 ## Disclaimer
 
