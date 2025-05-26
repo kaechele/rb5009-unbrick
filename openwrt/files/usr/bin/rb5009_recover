@@ -1,0 +1,106 @@
+#!/bin/sh
+#
+# Backup SPI NOR Flash and recover ATF/Backup Bootloader on MikroTik RB5009
+# (c) 2025 Felix Kaechele <felix@kaechele.ca>
+
+BROKEN_BACKUP_FILENAME="/mnt/RB5009-flash-backup-broken.bin"
+FIXED_BACKUP_FILENAME="/mnt/RB5009-flash-backup-fixed.bin"
+RESTORE_FILE="/usr/share/mikrotik/atf_bb.bin"
+
+err() {
+    printf '%s\n' "Error: $*" >&2
+    exit 1
+}
+
+backup() {
+
+    if ! mount | grep -q '^/dev/sda1 on /mnt '; then
+        printf 'Mounting /dev/sda1 to /mnt... '
+        if ! mount /dev/sda1 /mnt; then
+            err 'failed to mount /dev/sda1 on /mnt'
+        fi
+        printf 'OK\n'
+    fi
+
+    full=$(grep full_flash /proc/mtd | cut -d: -f1)
+    [ -n "$full" ] || err 'no full_flash entry in /proc/mtd'
+    flash_dev="/dev/$full"
+
+    printf 'Backing up %s → %s ...\n' "$flash_dev" "$1"
+    if ! pv -s $((0x1000000)) "$flash_dev" >"$1"; then
+        err 'pv backup failed'
+    fi
+    printf 'Done.\n'
+}
+
+printf 'Create flash backup to disk? [Y/n] '
+read ans
+
+[ -z "$ans" ] && ans=Y
+
+case "$ans" in
+[nN]*)
+    printf 'Skipping flash backup.\n'
+    ;;
+*)
+    backup "$BROKEN_BACKUP_FILENAME"
+    ;;
+esac
+
+printf '\nEntering the DANGER ZONE. This will overwrite ARM Trusted Firmware and Backup Bootloader.\n'
+printf 'Only run this if you are trying to restore a dead MikroTik RB5009.\n'
+printf 'You are doing this completely AT YOUR OWN RISK!\n\n'
+printf 'Restore ATF/bootloader from %s? [y/N] ' "$RESTORE_FILE"
+read ans2
+
+[ -z "$ans2" ] && ans2=N
+
+case "$ans2" in
+[yY]*)
+    bb=$(grep atf_bb /proc/mtd | cut -d: -f1)
+    [ -n "$bb" ] || err 'no atf_bb entry in /proc/mtd'
+    bb_dev="/dev/$bb"
+
+    printf 'Writing %s → %s ... ' "$RESTORE_FILE" "$bb_dev"
+    if ! mtd write "$RESTORE_FILE" "$bb_dev"; then
+        err 'mtd write failed'
+    fi
+    printf 'Done.\n'
+
+    printf 'Take another backup of the fixed flash? [y/N] '
+    read fixed_backup_ans
+    [ -z "$fixed_backup_ans" ] && fixed_backup_ans=N
+
+    case "$fixed_backup_ans" in
+    [yY]*)
+        printf 'Taking backup of fixed flash...\n'
+        backup "$FIXED_BACKUP_FILENAME"
+        ;;
+    *)
+        printf 'Skipping backup of fixed flash.\n'
+        ;;
+    esac
+
+    printf 'Reboot now? [y/N] '
+    read reboot_ans
+    [ -z "$reboot_ans" ] && reboot_ans=N
+
+    case "$reboot_ans" in
+    [yY]*)
+        printf 'Rebooting system...\n'
+        reboot
+        ;;
+    *)
+        printf 'Skipping reboot. Exiting.\n'
+        exit 0
+        ;;
+    esac
+    ;;
+
+*)
+    printf 'Restore skipped. Exiting.\n'
+    exit 0
+    ;;
+esac
+
+exit 0

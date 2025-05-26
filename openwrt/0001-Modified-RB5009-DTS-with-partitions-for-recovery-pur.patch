@@ -1,0 +1,42 @@
+From c016d83d6198530999999e40ab6c0ff1a601f0e5 Mon Sep 17 00:00:00 2001
+From: Felix Kaechele <felix@kaechele.ca>
+Date: Sun, 25 May 2025 22:13:36 -0400
+Subject: [PATCH] Modified RB5009 DTS with partitions for recovery purposes
+
+---
+ .../boot/dts/marvell/armada-7040-rb5009.dts     | 17 ++++++-----------
+ 1 file changed, 6 insertions(+), 11 deletions(-)
+
+diff --git a/target/linux/mvebu/files-6.6/arch/arm64/boot/dts/marvell/armada-7040-rb5009.dts b/target/linux/mvebu/files-6.6/arch/arm64/boot/dts/marvell/armada-7040-rb5009.dts
+index 023370a67805..783fe2bef2d1 100644
+--- a/target/linux/mvebu/files-6.6/arch/arm64/boot/dts/marvell/armada-7040-rb5009.dts
++++ b/target/linux/mvebu/files-6.6/arch/arm64/boot/dts/marvell/armada-7040-rb5009.dts
+@@ -158,19 +158,14 @@
+ 				};
+ 			};
+ 
+-			partition@b0000 {
+-				label = "RouterBOOT-primary";
+-				reg = <0xb0000 0x10000>;
++			partition@1 {
++				label = "atf_bb";
++				reg = <0x0 0xaf000>;
+ 			};
+ 
+-			/* Empty space on NOR repurposed for U-Boot environment */
+-			partition@fe0000 {
+-				label = "u-boot-env";
+-				reg = <0xfe0000 0x20000>;
+-
+-				nvmem-layout {
+-					compatible = "u-boot,env";
+-				};
++			partition@2 {
++				label = "full_flash";
++				reg = <0x0 0x1000000>;
+ 			};
+ 		};
+ 	};
+-- 
+2.49.0
+
