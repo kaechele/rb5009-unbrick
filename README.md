@@ -105,8 +105,9 @@ You will need:
 ### Recovery
 
 1. From within the extracted folder of this repository run the `mvebu64boot`
-   command (provided in this repository as a static x86_64 binary) to boot the
-   RB5009 from UART recovery mode using `rescue-loader.bin`:
+   command to boot the RB5009 from UART recovery mode using `rescue-loader.bin`.
+   A static x86_64 (`mvebu64boot`) and aarch64 (`mvebu64boot.aarch64`) binary is
+   provided in the repository for your convenience.
 
    ```
    ./mvebu64boot -t -b rescue-loader.bin /dev/ttyACM0
