@@ -1,0 +1,75 @@
+name: Build Rescue Loader
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "*"
+    paths:
+      - "rescue-loader/**"
+      - ".github/workflows/build-rescue-loader.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: https://github.com/actions/checkout@v4
+
+      - name: Install cross-compilation tools
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt-get -qq update && sudo apt-get -qq upgrade
+          sudo apt-get -qq install bison flex gcc-aarch64-linux-gnu
+          sudo apt-get -qq autoremove --purge
+          sudo apt-get -qq clean
+
+      - name: Checkout robimarko/u-boot repository
+        run: |
+          git clone --depth 1 --branch mikrotik/rb5009 https://github.com/robimarko/u-boot.git
+
+      - name: Checkout robimarko/arm-trusted-firmware repository
+        run: |
+          git clone --depth 1 --branch mikrotik/rb5009 https://github.com/robimarko/arm-trusted-firmware.git
+
+      - name: Checkout MarvellEmbeddedProcessors/binaries-marvell repository
+        run: |
+          git clone --depth 1 --branch binaries-marvell-armada-SDK10.0.1.0 https://github.com/MarvellEmbeddedProcessors/binaries-marvell.git
+
+      - name: Checkout MarvellEmbeddedProcessors/mv-ddr-marvell repository
+        run: |
+          git clone --depth 1 https://github.com/MarvellEmbeddedProcessors/mv-ddr-marvell.git
+
+      - name: Build U-Boot
+        run: |
+          cp rescue-loader/u-boot/mikrotik-rb5009.env u-boot/board/Marvell/mvebu_armada-8k/mikrotik-rb5009.env
+          cd u-boot
+          make mvebu_rb5009_defconfig
+          make -j$(nproc) CROSS_COMPILE=aarch64-linux-gnu-
+          cp u-boot.bin ../u-boot.bin
+
+      - name: Build ARM Trusted Firmware
+        run: |
+          cd arm-trusted-firmware
+          make CROSS_COMPILE=aarch64-linux-gnu- PLAT=a70x0_rb5009 BL33=../u-boot/u-boot.bin SCP_BL2=../binaries-marvell/mrvl_scp_bl2.img MV_DDR_PATH=../mv-ddr-marvell/ mrvl_flash && \
+          cp build/a70x0_rb5009/release/flash-image.bin ../rescue-loader.bin
+
+      - name: Upload artifacts
+        uses: https://data.forgejo.org/forgejo/upload-artifact@v4
+        with:
+          name: rescue-loader
+          path: |
+            u-boot.bin
+            rescue-loader.bin
+
+      - name: Upload binaries to release
+        uses: https://github.com/svenstaro/upload-release-action@v2
+        if: github.ref_type == 'tag'
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: "*.bin"
+          file_glob: true
+          asset_name: rescue-loader.bin
+          tag: ${{ github.ref }}
+          overwrite: true

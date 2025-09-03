@@ -1,0 +1,90 @@
+name: Build static utility binaries
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "*"
+    paths:
+      - "mthcutil/**"
+      - ".github/workflows/build-utils.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:latest
+    strategy:
+      matrix:
+        arch:
+          - debian: amd64
+            target: x86_64-linux-gnu
+          - debian: arm64
+            target: aarch64-linux-gnu
+          - debian: armel
+            target: arm-linux-gnueabi
+          - debian: armhf
+            target: arm-linux-gnueabihf
+
+    steps:
+      - name: Install cross-compilation tools
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          dpkg --add-architecture ${{ matrix.arch.debian }}
+          apt-get -qq update && apt-get -qq upgrade
+          apt-get -qq install git make nodejs gcc libc6-dev libncurses-dev libtinfo-dev \
+              crossbuild-essential-${{ matrix.arch.debian }} \
+              libc6-dev:${{ matrix.arch.debian }} \
+              libncurses-dev:${{ matrix.arch.debian }} \
+              libtinfo-dev:${{ matrix.arch.debian }}
+          apt-get -qq autoremove --purge
+          apt-get -qq clean
+
+      - name: Checkout repository
+        uses: https://github.com/actions/checkout@v4
+
+      - name: Checkout pali/mvebu64boot repository
+        run: |
+          git clone --depth 1 https://github.com/pali/mvebu64boot.git
+
+      - name: Build mvebu64boot
+        run: |
+          cd mvebu64boot
+          make CC=${{ matrix.arch.target }}-gcc CPPFLAGS=-static
+
+      - name: Build mthcutil
+        run: |
+          cd mthcutil
+          make CC=${{ matrix.arch.target }}-gcc CPPFLAGS=-static
+
+      - name: Upload mvebu64boot artifacts
+        uses: https://data.forgejo.org/forgejo/upload-artifact@v4
+        with:
+          name: mvebu64boot-static-${{ matrix.arch.debian }}
+          path: mvebu64boot/mvebu64boot
+
+      - name: Upload mthcutil artifacts
+        uses: https://data.forgejo.org/forgejo/upload-artifact@v4
+        with:
+          name: mthcutil-static-${{ matrix.arch.debian }}
+          path: mthcutil/mthcutil
+
+      - name: Upload mvebu64boot binaries to release
+        uses: https://github.com/svenstaro/upload-release-action@v2
+        if: github.ref_type == 'tag'
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: mvebu64boot/mvebu64boot
+          asset_name: mvebu64boot-static-${{ matrix.arch.debian }}
+          tag: ${{ github.ref }}
+          overwrite: true
+
+      - name: Upload mthcutil binaries to release
+        uses: https://github.com/svenstaro/upload-release-action@v2
+        if: github.ref_type == 'tag'
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: mthcutil/mthcutil
+          asset_name: mthcutil-static-${{ matrix.arch.debian }}
+          tag: ${{ github.ref }}
+          overwrite: true
